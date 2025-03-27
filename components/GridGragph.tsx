@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import styles from './GridGraph.styles';
 
 const CELL_SIZE = 50;
 
@@ -27,17 +28,33 @@ type NodeData = {
   col: number;
   color: string;
   id: number;
+  subId: number;
 };
 
 const colorOptions = ['#7BFF00', '#FFFF61', '#FF18C8', '#972AFF', '#1BEAFF'];
 
 const GridGraph = () => {
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [rows, setRows] = useState(1);
   const [cols] = useState(50);
   const [placedNodes, setPlacedNodes] = useState<NodeData[]>([]);
   const [hoveredCell, setHoveredCell] = useState<HoverCellData | null>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [animationQueue, setAnimationQueue] = useState<NodeData[] | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    row: number;
+    col: number;
+    targetNode?: NodeData;
+  } | null>(null);
+  const dragNode = useRef<NodeData | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const newSocket = io(undefined, { path: '/api/socket' });
@@ -50,20 +67,56 @@ const GridGraph = () => {
     };
   }, []);
 
-  const handleCellClick = (row: number, col: number) => {
+  const handleAddUser = (row: number, col: number) => {
     if (!placedNodes.some((node) => node.row === row && node.col === col)) {
-      const colorIndex = hoveredCell?.colorIndex ?? 0;
+      const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+      const newId = Date.now();
       const newNode: NodeData = {
         row,
         col,
-        color: colorOptions[colorIndex],
-        id: colorIndex + 1,
+        color: randomColor,
+        id: newId,
+        subId: 0,
       };
       setPlacedNodes([...placedNodes, newNode]);
       if (socket) {
         socket.emit('nodePlaced', newNode);
       }
     }
+  };
+
+  const handleAddNextNode = (origin: NodeData) => {
+    const right = { row: origin.row, col: origin.col + 1 };
+    const maxSubId = Math.max(
+      0,
+      ...placedNodes.filter((n) => n.id === origin.id).map((n) => n.subId)
+    );
+    const newNode: NodeData = {
+      row: right.row,
+      col: right.col,
+      color: origin.color,
+      id: origin.id,
+      subId: maxSubId + 1,
+    };
+    setPlacedNodes([...placedNodes, newNode]);
+    if (socket) {
+      socket.emit('nodePlaced', newNode);
+    }
+  };
+
+  const handleDragStart = (node: NodeData) => {
+    dragNode.current = node;
+  };
+
+  const handleDrop = (row: number, col: number) => {
+    if (!dragNode.current) return;
+
+    const newNode = { ...dragNode.current, row, col };
+    const filtered = placedNodes.filter(
+      (n) => !(n.row === dragNode.current!.row && n.col === dragNode.current!.col && n.id === dragNode.current!.id && n.subId === dragNode.current!.subId)
+    );
+    setPlacedNodes([...filtered, newNode]);
+    dragNode.current = null;
   };
 
   const getCellCenter = (row: number, col: number) => {
@@ -144,38 +197,20 @@ const GridGraph = () => {
 
   return (
     <div>
-      <style>{`
-        @keyframes draw {
-          to {
-            stroke-dashoffset: 0;
-          }
-        }
-      `}</style>
-
       <div style={{ marginBottom: 10 }}>
         <button onClick={addRow}>+ 행 추가</button>
-        <button onClick={downloadJson} style={{ marginLeft: 10 }}>💾 저장</button>
-        <input type="file" accept="application/json" onChange={handleFileUpload} style={{ marginLeft: 10 }} />
-        <button onClick={handlePlayClick} style={{ marginLeft: 10 }}>▶️ 재생</button>
+        <button onClick={downloadJson} style={styles.buttonMargin}>💾 저장</button>
+        <input type="file" accept="application/json" onChange={handleFileUpload} style={styles.buttonMargin} />
+        <button onClick={handlePlayClick} style={styles.buttonMargin}>▶️ 재생</button>
       </div>
 
-      <div
-        className="grid-container"
-        style={{ width: cols * CELL_SIZE, height: rows * CELL_SIZE }}
-      >
-        <div
-          className="grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${cols}, ${CELL_SIZE}px)`,
-            gridTemplateRows: `repeat(${rows}, ${CELL_SIZE}px)`
-          }}
-        >
+      <div className="grid-container" style={styles.gridContainer(cols, rows)}>
+        <div className="grid" style={styles.grid(cols, rows)}>
           {Array.from({ length: rows }).map((_, row) =>
             Array.from({ length: cols }).map((_, col) => {
-              const isNodePlaced = placedNodes.some((node) => node.row === row && node.col === col);
+              const node = placedNodes.find((node) => node.row === row && node.col === col);
               let cellStyle: React.CSSProperties = {};
-              if (hoveredCell && hoveredCell.row === row && hoveredCell.col === col && !isNodePlaced) {
+              if (hoveredCell && hoveredCell.row === row && hoveredCell.col === col && !node) {
                 cellStyle.backgroundColor = hexToRgba(colorOptions[hoveredCell.colorIndex], 0.3);
               }
               return (
@@ -185,25 +220,26 @@ const GridGraph = () => {
                   style={cellStyle}
                   onMouseEnter={() => setHoveredCell({ row, col, colorIndex: 0 })}
                   onMouseLeave={() => setHoveredCell(null)}
-                  onWheel={(e) => {
-                    if (hoveredCell && hoveredCell.row === row && hoveredCell.col === col) {
-                      const delta = e.deltaY > 0 ? 1 : -1;
-                      setHoveredCell({
-                        ...hoveredCell,
-                        colorIndex: (hoveredCell.colorIndex + delta + colorOptions.length) % colorOptions.length,
-                      });
-                    }
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({
+                      visible: true,
+                      x: e.clientX,
+                      y: e.clientY,
+                      row,
+                      col,
+                      targetNode: node,
+                    });
                   }}
-                  onClick={() => handleCellClick(row, col)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleDrop(row, col)}
                 >
-                  {isNodePlaced && (
+                  {node && (
                     <div
                       className="node-fixed"
-                      style={{
-                        backgroundColor: placedNodes.find(
-                          (node) => node.row === row && node.col === col
-                        )?.color,
-                      }}
+                      style={styles.nodeFixed(node.color)}
+                      draggable
+                      onDragStart={() => handleDragStart(node)}
                     />
                   )}
                 </div>
@@ -230,19 +266,27 @@ const GridGraph = () => {
                 fill="none"
                 stroke={group[0].color}
                 strokeWidth="2"
-                ref={(el) => {
-                  if (el) {
-                    const length = el.getTotalLength();
-                    el.style.strokeDasharray = `${length}`;
-                    el.style.strokeDashoffset = `${length}`;
-                    el.style.animation = 'draw 0.8s ease forwards';
-                  }
-                }}
               />
             );
           })}
         </svg>
       </div>
+
+      {contextMenu?.visible && (
+        <ul style={styles.contextMenu(contextMenu.x, contextMenu.y)} onClick={() => setContextMenu(null)}>
+          {!contextMenu.targetNode ? (
+            <li style={styles.contextMenuItem} onClick={() => {
+              handleAddUser(contextMenu.row, contextMenu.col);
+              setContextMenu(null);
+            }}>➕ Add user</li>
+          ) : (
+            <li style={styles.contextMenuItem} onClick={() => {
+              handleAddNextNode(contextMenu.targetNode!);
+              setContextMenu(null);
+            }}>➕ Add next node</li>
+          )}
+        </ul>
+      )}
     </div>
   );
 };
