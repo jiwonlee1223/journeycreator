@@ -1,3 +1,4 @@
+// GridGraph.styles.ts
 const CELL_SIZE = 50;
 
 const styles = {

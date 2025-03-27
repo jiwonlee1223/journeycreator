@@ -110,14 +110,23 @@ const GridGraph = () => {
 
   const handleDrop = (row: number, col: number) => {
     if (!dragNode.current) return;
-
-    const newNode = { ...dragNode.current, row, col };
-    const filtered = placedNodes.filter(
-      (n) => !(n.row === dragNode.current!.row && n.col === dragNode.current!.col && n.id === dragNode.current!.id && n.subId === dragNode.current!.subId)
-    );
-    setPlacedNodes([...filtered, newNode]);
+  
+    const updatedNodes = placedNodes.map((node) => {
+      if (
+        node.row === dragNode.current!.row &&
+        node.col === dragNode.current!.col &&
+        node.id === dragNode.current!.id &&
+        node.subId === dragNode.current!.subId
+      ) {
+        return { ...node, row, col }; // ✅ 위치만 변경, subId 그대로 유지
+      }
+      return node;
+    });
+  
+    setPlacedNodes(updatedNodes); // 🧠 subId 순서 유지!
     dragNode.current = null;
   };
+  
 
   const getCellCenter = (row: number, col: number) => {
     return { x: col * CELL_SIZE + CELL_SIZE / 2, y: row * CELL_SIZE + CELL_SIZE / 2 };
