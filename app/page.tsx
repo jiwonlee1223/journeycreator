@@ -1,7 +1,7 @@
 
 import React from 'react';
 import SocketClient from '../components/SocketClient';
-import GridGraph from '../components/GridGragph'
+import GridGraph from '../components/GridGraph'
 
 const HomePage: React.FC = () => {
   return (
