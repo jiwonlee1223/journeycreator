@@ -54,6 +54,9 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             - nodes info에는 사용자 여정의 흐름을 nodeId와 nodeSubId를 기준으로 기술한다.
             - nodeId는 "001" 형식으로 하나의 사용자에 고유하게 부여되며, nodeSubId는 해당 사용자의 여정 단계 번호이다 (0부터 시작).
             - 시간 흐름이 생길 때마다 row와 col이 각각 +1씩 증가하도록 해줘. 즉, 각 노드는 (0,0), (1,1), (2,2) … 처럼 우하향 대각선 위치에 위치해야 한다.
+            - 시나리오에 등장하는 사용자가 여러 명인 경우, 각 사용자마다 고유한 nodeId("001", "002", …)를 부여하라. 각 사용자의 여정은 독립적인 nodeSubId 흐름으로 구성하고, nodes info 내에 함께 출력하라.
+            각 사용자의 여정은 독립적으로 표현되며, nodeId가 동일한 노드끼리는 하나의 사용자 여정 흐름을 구성한다.
+            - 하나의 grid cell(row, col 조합)에는 하나의 노드만 배치할 수 있다. 동일한 row라도 사용자마다 col 값을 다르게 지정해 중복을 피해야 한다. 모든 노드는 서로 다른 (row, col) 좌표를 가져야 한다.
             - row는 시간 순서 기준, col은 같은 시간대에서의 분기 지점이나 선택지를 의미한다.
             - 출력은 JSON 형식이 정확히 맞아야 하며, 그대로 .json 파일로 저장 가능한 구조로 작성하라. 모든 문자열은 따옴표로 감싸고, 쉼표 및 괄호 누락 없이 완성된 JSON 문서를 출력해야 한다.
             - 출력 형식을 반드시 지키시오.
@@ -134,8 +137,22 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
               messages: [{ role: "user", content: finalPrompt }],
             });
 
-            const result = completion.choices[0]?.message?.content ?? "[빈 응답]";
-            socket.emit("completion", result);
+            const resultRaw = completion.choices[0]?.message?.content ?? "[빈 응답]";
+
+            // 1. ```json 또는 ``` 제거
+            const cleaned = resultRaw.replace(/```json|```/g, "").trim();
+
+            // 2. JSON 파싱 시도
+            try {
+              const parsed = JSON.parse(cleaned);
+
+              // 3. 유효하면 emit (클라이언트에서 다운로드 가능하도록 전송)
+              socket.emit("completion", JSON.stringify(parsed, null, 2));
+            } catch (e) {
+              console.error("⚠️ JSON 파싱 실패:", e);
+              socket.emit("completion", "[⚠️ JSON 형식이 잘못되었습니다. 응답을 다시 확인해주세요.]");
+            }
+
           } catch (err) {
             console.error("❌ OpenAI 호출 실패:", err);
             socket.emit("completion", "[OpenAI 호출 중 오류 발생]");
