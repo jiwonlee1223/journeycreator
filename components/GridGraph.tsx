@@ -5,8 +5,10 @@ import { io, Socket } from 'socket.io-client';             // Socket.IO 클라�
 import styles from './GridGraph.styles';
 import ControlPanel from "./ControlPanel"; // 경로는 실제 위치에 맞춰 조정
 import TouchpointContainer from "./TouchpointContainer";
+import PromptBox from "./PromptBox";
 
 const CELL_SIZE = 50; // 그리드 셀의 크기를 픽셀 단위로 상수화
+
 
 // HEX 색상값을 RGBA 문자열로 변환해주는 유틸 함수
 function hexToRgba(hex: string, alpha: number = 0.3): string {
@@ -27,14 +29,14 @@ type HoverCellData = {
   colorIndex: number;
 };
 
-// 노드 정보 타입 정의
 type NodeData = {
-  row: number;    // 행 인덱스
-  col: number;    // 열 인덱스
-  color: string;  // 노드 색상(HEX)
-  id: number;     // 노드 그룹 식별용 ID
-  subId: number;  // 같은 그룹 내 순서를 위한 서브 ID
+  row: number;
+  col: number;
+  color: string;
+  id: string;     // ✅ "001", "002", ...
+  subId: number;  // nodeSubId로 저장됨
 };
+
 
 const colorOptions = ['#7BFF00', '#FFFF61', '#FF18C8', '#972AFF', '#1BEAFF']; // 랜덤 색상 옵션
 
@@ -43,6 +45,7 @@ const GridGraph = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   // 그리드 행 개수 상태
   const [rows, setRows] = useState(1);
+  const [rowTexts, setRowTexts] = useState<string[]>([""]);
   // 그리드 열 개수(고정)
   const [cols] = useState(50);
   // 배치된 노드 목록 상태
@@ -62,6 +65,11 @@ const GridGraph = () => {
   } | null>(null);
   // 드래그 중인 노드 참조용 ref
   const dragNode = useRef<NodeData | null>(null);
+  const [nextGroupId, setNextGroupId] = useState(1);
+
+  const [prompt1, setPrompt1] = useState("");
+  const [prompt2, setPrompt2] = useState("");
+
 
   // 페이지 바깥 클릭 시 컨텍스트 메뉴 닫기
   useEffect(() => {
@@ -86,30 +94,42 @@ const GridGraph = () => {
   const handleAddUser = (row: number, col: number) => {
     if (!placedNodes.some(node => node.row === row && node.col === col)) {
       const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
-      const newId = Date.now();
-      const newNode: NodeData = { row, col, color: randomColor, id: newId, subId: 0 };
-      setPlacedNodes([...placedNodes, newNode]);
-      if (socket) socket.emit('nodePlaced', newNode);
+      const newNodeId = String(nextGroupId).padStart(3, "0");
+
+      const newNode: NodeData = {
+        row,
+        col,
+        color: randomColor,
+        id: newNodeId, // ✅ 문자열 nodeId
+        subId: 0,
+      };
+
+      setPlacedNodes(prev => [...prev, newNode]);
+      setNextGroupId(prev => prev + 1);
+
+      if (socket) socket.emit("nodePlaced", newNode);
     }
   };
 
-  // 기존 노드 오른쪽에 서브 노드 추가
   const handleAddNextNode = (origin: NodeData) => {
-    const right = { row: origin.row, col: origin.col + 1 };
     const maxSubId = Math.max(
       0,
-      ...placedNodes.filter(n => n.id === origin.id).map(n => n.subId)
+      ...placedNodes.filter((n) => n.id === origin.id).map((n) => n.subId)
     );
+
     const newNode: NodeData = {
-      row: right.row,
-      col: right.col,
+      row: origin.row,
+      col: origin.col + 1,
       color: origin.color,
-      id: origin.id,
+      id: origin.id,              // ✅ 기존 nodeId 유지
       subId: maxSubId + 1,
     };
-    setPlacedNodes([...placedNodes, newNode]);
-    if (socket) socket.emit('nodePlaced', newNode);
+
+    setPlacedNodes(prev => [...prev, newNode]);
+
+    if (socket) socket.emit("nodePlaced", newNode);
   };
+
 
   // 드래그 시작 시 해당 노드를 ref에 저장
   const handleDragStart = (node: NodeData) => {
@@ -142,25 +162,46 @@ const GridGraph = () => {
 
   // 같은 id 그룹별로 노드 묶기
   const groupedNodes = placedNodes.reduce((acc, node) => {
-    if (!node || typeof node.id !== 'number') return acc;
+    if (!node) return acc;
     (acc[node.id] = acc[node.id] || []).push(node);
     return acc;
-  }, {} as { [key: number]: NodeData[] });
+  }, {} as Record<string, NodeData[]>);
 
   // 행 추가 버튼 핸들러
-  const addRow = () => setRows(prev => prev + 1);
+  const addRow = () => {
+    setRows(prev => prev + 1);
+    setRowTexts(prev => [...prev, ""]); // 새 row에 대응하는 빈 텍스트 추가
+  };
+
 
   // 현재 노드 데이터를 JSON으로 다운로드
   const downloadJson = () => {
-    const json = JSON.stringify(placedNodes, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
+    const structured = rowTexts.map((text, rowIndex) => {
+      const nodes = placedNodes
+        .filter((node) => node.row === rowIndex)
+        .map((node) => ({
+          nodeId: node.id,
+          row: node.row,
+          col: node.col,
+          nodeSubId: node.subId,
+        }));
+  
+      return {
+        touchpoints: text, // ✅ 여기를 변경
+        "nodes info": nodes,
+      };
+    });
+  
+    const json = JSON.stringify(structured, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'graph-data.json';
+    a.download = "graph-data.json";
     a.click();
     URL.revokeObjectURL(url);
   };
+  
 
   // 애니메이션 큐 재생 함수
   const playNodesWithAnimation = (nodes: NodeData[]) => {
@@ -174,62 +215,97 @@ const GridGraph = () => {
         return;
       }
       const next = nodes[i];
-      if (next && typeof next.id === 'number') {
+      if (next) {
         setPlacedNodes(prev => [...prev, next]);
       }
       i++;
     }, 300);
   };
 
-  // JSON 파일 업로드 핸들러
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
+
         if (Array.isArray(parsed)) {
-          const cleaned = parsed.filter(
-            (node: any) =>
-              node &&
-              typeof node.id === 'number' &&
-              typeof node.row === 'number' &&
-              typeof node.col === 'number' &&
-              typeof node.color === 'string'
+          const newRowTexts: string[] = parsed.map((item) => item.touchpoints ?? []);
+
+          const nodeIdToColor: Record<string, string> = {};
+          const colorOptions = ['#7BFF00', '#FFFF61', '#FF18C8', '#972AFF', '#1BEAFF'];
+
+          const newPlacedNodes: NodeData[] = parsed.flatMap((item) =>
+            item["nodes info"].map((node: any) => {
+              const nodeId = node.nodeId;
+              if (!nodeIdToColor[nodeId]) {
+                nodeIdToColor[nodeId] = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+              }
+
+              return {
+                row: node.row,
+                col: node.col,
+                id: nodeId,
+                subId: node.nodeSubId,
+                color: nodeIdToColor[nodeId], // ✅ 랜덤으로 부여
+              };
+            })
           );
-          setAnimationQueue(cleaned);
-          playNodesWithAnimation(cleaned);
+
+          setRowTexts(newRowTexts);
+          setRows(newRowTexts.length);
+          playNodesWithAnimation(newPlacedNodes);
         }
-      } catch {
-        console.error("Invalid JSON file");
+      } catch (err) {
+        console.error("❌ Invalid JSON file", err);
       }
     };
+
     reader.readAsText(file);
   };
+
 
   // ‘▶ 재생’ 버튼 클릭 시 애니메이션 재생
   const handlePlayClick = () => {
     if (animationQueue) playNodesWithAnimation(animationQueue);
   };
 
+  const handleRowTextChange = (index: number, value: string) => {
+    setRowTexts(prev => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
+
+
   // 렌더링 부분: 버튼 그룹과 그리드 + SVG 오버레이 + 컨텍스트 메뉴
   return (
+
     <div>
+      <PromptBox
+        prompt1={prompt1}
+        prompt2={prompt2}
+        onChangePrompt1={setPrompt1}
+        onChangePrompt2={setPrompt2}
+      />
+
       <ControlPanel
         onDownload={downloadJson}
         onFileUpload={handleFileUpload}
         onPlay={handlePlayClick} onAddRow={function (): void {
           throw new Error('Function not implemented.');
-        } }      />
-  
-      {/* 버튼과 그리드를 같은 상대좌표 기준으로 묶기 */}
-      <div style={{ position: "relative" }}>
-        {/* + 버튼: 마지막 row 기준 왼쪽 아래에 위치 */}
+        }} />
+
+      <div style={{ display: "flex" }}>
         <TouchpointContainer
           onAddRow={addRow}
           rows={rows}
           cellSize={CELL_SIZE}
+          rowTexts={rowTexts}
+          onRowTextChange={handleRowTextChange}
         />
 
         {/* 그리드 컨테이너 */}
@@ -273,24 +349,30 @@ const GridGraph = () => {
 
           {/* 노드 그룹 선 연결용 SVG 오버레이 */}
           <svg className="svg-overlay">
-            {Object.keys(groupedNodes).map(key => {
-              const group = groupedNodes[Number(key)];
+            {Object.keys(groupedNodes).map((key) => {
+              const group = groupedNodes[key];
               if (group.length < 2) return null;
-              const points = group.map(n => {
+
+              // ✅ nodeSubId 기준으로 정렬
+              const sorted = [...group].sort((a, b) => a.subId - b.subId);
+
+              const points = sorted.map((n) => {
                 const { x, y } = getCellCenter(n.row, n.col);
                 return `${x},${y}`;
-              }).join(' ');
+              }).join(" ");
+
               return (
                 <polyline
                   key={`${key}-${group.length}`}
                   points={points}
                   fill="none"
-                  stroke={group[0].color}
+                  stroke={sorted[0].color}
                   strokeWidth="2"
                 />
               );
             })}
           </svg>
+
         </div>
 
         {/* 컨텍스트 메뉴 */}
