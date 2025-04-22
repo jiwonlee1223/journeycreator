@@ -1,8 +1,6 @@
-// components/ControlPanel.tsx
 "use client";
 
 import React from "react";
-import styles from "./GridGraph.styles"; // 필요하다면 별도 스타일 파일로 분리해도 좋습니다.
 
 interface ControlPanelProps {
     onAddRow: () => void;
@@ -17,24 +15,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     onFileUpload,
     onPlay,
 }) => (
-    <div style={{ marginBottom: 10 }}>
+    <div className="control-panel">
+        <button onClick={onDownload} className="dark-button">
+            <span className="material-symbols-outlined">download</span>
+        </button>
 
-        <button onClick={onDownload}>
-            <span className="material-symbols-outlined">
-                download
-            </span>
-        </button>
-        <input
-            type="file"
-            accept="application/json"
-            onChange={onFileUpload}
-            style={styles.buttonMargin}
-        />
-        <button onClick={onPlay} style={styles.buttonMargin}>
-            <span className="material-symbols-outlined">
-                play_arrow
-            </span>
-        </button>
+        <label className="dark-button" style={{ cursor: "pointer" }}>
+            <span className="material-symbols-outlined">upload</span>
+            <input
+                type="file"
+                accept="application/json"
+                onChange={onFileUpload}
+                className="hidden-input"
+            />
+        </label>
     </div>
 );
 

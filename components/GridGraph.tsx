@@ -1,8 +1,14 @@
-"use client"; // Next.js에서 이 컴포넌트를 클라이언트 사이드에서 렌더링하라는 지시어
+"use client";
 
 import React, { useState, useEffect, useRef } from 'react'; // React와 훅(useState, useEffect, useRef) 불러오기
 import { io, Socket } from 'socket.io-client';             // Socket.IO 클라이언트와 타입(Socket) 불러오기
-import styles from './GridGraph.styles';
+import {
+  gridContainer,
+  gridStyle,
+  nodeFixedStyle,
+  contextMenuStyle,
+  contextMenuItemStyle,
+} from "@/components/GridGraph.styles";
 import ControlPanel from "./ControlPanel"; // 경로는 실제 위치에 맞춰 조정
 import TouchpointContainer from "./TouchpointContainer";
 import PromptBox from "./PromptBox";
@@ -130,6 +136,21 @@ const GridGraph = () => {
     if (socket) socket.emit("nodePlaced", newNode);
   };
 
+  const handleDeleteNode = (node: NodeData) => {
+    setPlacedNodes((prev) =>
+      prev.filter(
+        (n) =>
+          !(
+            n.row === node.row &&
+            n.col === node.col &&
+            n.id === node.id &&
+            n.subId === node.subId
+          )
+      )
+    );
+    setContextMenu(null); // 삭제 후 메뉴 닫기
+  };
+  
 
   // 드래그 시작 시 해당 노드를 ref에 저장
   const handleDragStart = (node: NodeData) => {
@@ -185,13 +206,13 @@ const GridGraph = () => {
           col: node.col,
           nodeSubId: node.subId,
         }));
-  
+
       return {
         touchpoints: text, // ✅ 여기를 변경
         "nodes info": nodes,
       };
     });
-  
+
     const json = JSON.stringify(structured, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -201,7 +222,7 @@ const GridGraph = () => {
     a.click();
     URL.revokeObjectURL(url);
   };
-  
+
 
   // 애니메이션 큐 재생 함수
   const playNodesWithAnimation = (nodes: NodeData[]) => {
@@ -309,8 +330,8 @@ const GridGraph = () => {
         />
 
         {/* 그리드 컨테이너 */}
-        <div className="grid-container" style={styles.gridContainer(cols, rows)}>
-          <div className="grid" style={styles.grid(cols, rows)}>
+        <div className="grid-container" style={gridContainer(cols, rows)}>
+          <div className="grid" style={gridStyle(cols, rows)}>
             {Array.from({ length: rows }).map((_, row) =>
               Array.from({ length: cols }).map((_, col) => {
                 const node = placedNodes.find(n => n.row === row && n.col === col);
@@ -336,7 +357,7 @@ const GridGraph = () => {
                     {node && (
                       <div
                         className="node-fixed"
-                        style={styles.nodeFixed(node.color)}
+                        style={nodeFixedStyle(node.color)}
                         draggable
                         onDragStart={() => handleDragStart(node)}
                       />
@@ -377,18 +398,40 @@ const GridGraph = () => {
 
         {/* 컨텍스트 메뉴 */}
         {contextMenu?.visible && (
-          <ul style={styles.contextMenu(contextMenu.x, contextMenu.y)} onClick={() => setContextMenu(null)}>
-            {!contextMenu.targetNode ? (
-              <li onClick={() => { handleAddUser(contextMenu.row, contextMenu.col); setContextMenu(null); }}>
-                ➕ Add user
-              </li>
-            ) : (
-              <li onClick={() => { handleAddNextNode(contextMenu.targetNode!); setContextMenu(null); }}>
-                ➕ Add next node
-              </li>
-            )}
-          </ul>
-        )}
+  <ul style={contextMenuStyle(contextMenu.x, contextMenu.y)}>
+    {!contextMenu.targetNode ? (
+      <li
+        style={contextMenuItemStyle}
+        onClick={() => {
+          handleAddUser(contextMenu.row, contextMenu.col);
+          setContextMenu(null);
+        }}
+      >
+        ➕ Add user
+      </li>
+    ) : (
+      <>
+        <li
+          style={contextMenuItemStyle}
+          onClick={() => {
+            handleAddNextNode(contextMenu.targetNode!);
+            setContextMenu(null);
+          }}
+        >
+          ➕ Add next node
+        </li>
+        <li
+          style={contextMenuItemStyle}
+          onClick={() => {
+            handleDeleteNode(contextMenu.targetNode!);
+          }}
+        >
+          ❌ Delete node
+        </li>
+      </>
+    )}
+  </ul>
+)}
       </div>
     </div>
   );

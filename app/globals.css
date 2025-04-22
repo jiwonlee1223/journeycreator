@@ -1,22 +1,55 @@
-/* styles/global.css */
-
-.grid-container {
-  position: relative;
+/* 기본 색상 정의 */
+:root {
+  --color-background: #1E1E1E;
+  --color-surface: #141414;
+  --color-surface-variant: #666666;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #B3B3B3;
+  --color-text-disabled: #666666;
+  --color-accent-primary: #3d3d3d;
+  --color-button-hover: #000000;
+  --color-accent-secondary: #03DAC6;
+  --color-error: #CF6679;
+  --color-success: #4CAF50;
+  --color-warning: #FFAB00;
+  --color-divider: #2C2C2C;
+  --shadow-default: rgba(0, 0, 0, 0.5);
+  --cell-size: 50px;
 }
 
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-background); /* 다크 배경 */
+  color: var(--color-text-primary); /* 기본 텍스트 색상 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  height: 100%;
+  width: 100%;
+}
+
+/* 그리드 컨테이너 */
+.grid-container {
+  position: relative;
+  background-color: var(--color-background);
+}
+
+/* 그리드 셀 */
 .grid {
   display: grid;
 }
 
+/* 각 셀 */
 .grid-cell {
   width: 50px;
   height: 50px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--color-divider);
   box-sizing: border-box;
   position: relative;
+  background-color: var(--color-surface);
+  transition: background-color 0.2s ease;
 }
 
-/* 고정된 노드 (셀 내부 중앙에 작게 표시) */
+/* 셀 안의 고정 노드 */
 .node-fixed {
   position: absolute;
   top: 50%;
@@ -26,8 +59,10 @@
   height: 10px;
   border-radius: 50%;
   opacity: 1;
+  box-shadow: 0 0 6px var(--shadow-default);
 }
 
+/* 노드 선을 위한 SVG 오버레이 */
 .svg-overlay {
   position: absolute;
   top: 0;
@@ -35,4 +70,150 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+/* 컨텍스트 메뉴 */
+ul.context-menu {
+  background-color: var(--color-surface-variant);
+  border: 1px solid var(--color-divider);
+  border-radius: 6px;
+  padding: 4px;
+  position: fixed;
+  z-index: 1000;
+  list-style: none;
+  box-shadow: 0 2px 10px var(--shadow-default);
+}
+
+ul.context-menu li {
+  padding: 6px 12px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+ul.context-menu li:hover {
+  background-color: var(--color-accent-primary);
+  color: #000;
+}
+
+/* 버튼 */
+
+.control-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.control-panel .dark-button,
+.control-panel input[type="file"].dark-button {
+  height: 30px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.dark-button {
+  background-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.dark-button:hover {
+  background-color: var(--color-button-hover);
+}
+
+.send-button {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  height: 30px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.prompt-textarea-wrapper {
+  position: relative;
+  width: 100%;
+  height: auto;
+}
+
+/* PromptBox, textarea 공통 */
+.prompt-container {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.prompt-textarea {
+  width: 100%;
+  height: 20vh;
+  resize: none;
+  padding: 12px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  box-sizing: border-box;
+}
+.half-width {
+  width: 50%;
+}
+
+/* 터치포인트 컨테이너 */
+.touchpoint-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 4px;
+}
+
+.touchpoint-input {
+  width: calc(var(--cell-size) * 4);
+  height: var(--cell-size);
+  margin-top: 0;
+  margin-bottom: 0;
+  box-sizing: border-box;
+  padding: 4px;
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-divider);
+  font-size: 14px;
+}
+
+.touchpoint-button {
+  width: calc(var(--cell-size) * 4);
+  height: var(--cell-size);
+  border: 1px solid var(--color-divider);
+  background-color: var(--color-surface-variant);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.touchpoint-button:hover {
+  background-color: var(--color-accent-primary);
+  color: black;
 }

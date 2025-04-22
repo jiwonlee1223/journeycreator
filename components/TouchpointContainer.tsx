@@ -19,45 +19,27 @@ const TouchpointContainer: React.FC<TouchpointContainerProps> = ({
   onRowTextChange,
 }) => {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-end",
-        marginRight: 4,
-      }}
-    >
-      {/* 세로 스택된 텍스트박스들 */}
+    <div className="touchpoint-container">
       {rowTexts.map((text, i) => (
         <input
           key={i}
           value={text}
           onChange={(e) => onRowTextChange(i, e.target.value)}
           placeholder={`Context ${i + 1}`}
+          className="touchpoint-input"
           style={{
             width: cellSize * 4,
             height: cellSize,
-            marginBottom: 0,
-            marginTop: 0,
-            boxSizing: "border-box",
-            padding: 4,
           }}
         />
       ))}
 
-      {/* + 버튼: 항상 맨 아래 */}
       <button
         onClick={onAddRow}
+        className="touchpoint-button"
         style={{
-          width: cellSize*4,
+          width: cellSize * 4,
           height: cellSize,
-          border: "1px solid #ccc",
-          background: "#fff",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginTop: 4,
         }}
       >
         <span className="material-symbols-outlined">add_row_below</span>
