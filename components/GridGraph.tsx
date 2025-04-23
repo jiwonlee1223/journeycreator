@@ -114,7 +114,40 @@ const GridGraph = () => {
       };
     });
   }
-  
+
+  const importFromPromptJson = (jsonString: string) => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      const normalized = normalizeRowsByTouchpointIndex(parsed); // ✅ row 정규화
+
+      const newRowTexts: string[] = normalized.map((item) => item.touchpoints ?? []);
+      const nodeIdToColor: Record<string, string> = {};
+      const colorOptions = ['#7BFF00', '#FFFF61', '#FF18C8', '#972AFF', '#1BEAFF', '#FF572E', '#3CFF99', '#FFD500', '#FF6AFF', '#14FFC9', '#FF0055', '#6E35FF', '#00FF8B', '#FF9A00', '#00C2FF', '#FF3D88', '#BAFF29', '#5800FF', '#FF375E', '#43FFD5'];
+
+      const newPlacedNodes: NodeData[] = normalized.flatMap((item) =>
+        item["nodes info"].map((node: any) => {
+          const nodeId = node.nodeId;
+          if (!nodeIdToColor[nodeId]) {
+            nodeIdToColor[nodeId] = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+          }
+
+          return {
+            row: node.row,
+            col: node.col,
+            id: nodeId,
+            subId: node.nodeSubId,
+            color: nodeIdToColor[nodeId],
+          };
+        })
+      );
+
+      setRowTexts(newRowTexts);
+      setRows(newRowTexts.length);
+      playNodesWithAnimation(newPlacedNodes);
+    } catch (err) {
+      console.error("❌ PromptBox → GridGraph JSON 파싱 에러:", err);
+    }
+  };
 
   // 페이지 바깥 클릭 시 컨텍스트 메뉴 닫기
   useEffect(() => {
@@ -303,7 +336,7 @@ const GridGraph = () => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         const normalized = normalizeRowsByTouchpointIndex(parsed); // ✅ row 정규화
-        
+
         if (Array.isArray(parsed)) {
           // ✅ row 값을 터치포인트 인덱스로 덮어쓰기
           const normalized = parsed.map((item, index) => {
@@ -316,18 +349,18 @@ const GridGraph = () => {
               "nodes info": updatedNodes
             };
           });
-        
+
           const newRowTexts: string[] = normalized.map((item) => item.touchpoints ?? []);
           const nodeIdToColor: Record<string, string> = {};
           const colorOptions = ['#7BFF00', '#FFFF61', '#FF18C8', '#972AFF', '#1BEAFF', '#FF572E', '#3CFF99', '#FFD500', '#FF6AFF', '#14FFC9', '#FF0055', '#6E35FF', '#00FF8B', '#FF9A00', '#00C2FF', '#FF3D88', '#BAFF29', '#5800FF', '#FF375E', '#43FFD5'];
-        
+
           const newPlacedNodes: NodeData[] = normalized.flatMap((item) =>
             item["nodes info"].map((node: any) => {
               const nodeId = node.nodeId;
               if (!nodeIdToColor[nodeId]) {
                 nodeIdToColor[nodeId] = colorOptions[Math.floor(Math.random() * colorOptions.length)];
               }
-        
+
               return {
                 row: node.row, // 이미 위에서 정규화됨
                 col: node.col,
@@ -337,7 +370,7 @@ const GridGraph = () => {
               };
             })
           );
-        
+
           setRowTexts(newRowTexts);
           setRows(newRowTexts.length); // ✅ now guaranteed to match
           playNodesWithAnimation(newPlacedNodes);
@@ -374,7 +407,9 @@ const GridGraph = () => {
         prompt2={prompt2}
         onChangePrompt1={setPrompt1}
         onChangePrompt2={setPrompt2}
+        onImportJson={importFromPromptJson} // ✅ 추가
       />
+
 
       <ControlPanel
         onDownload={downloadJson}
@@ -400,9 +435,8 @@ const GridGraph = () => {
                 const cellNodes = placedNodes.filter(n => n.row === row && n.col === col); // ✅ 여러 노드 가져오기
                 let cellStyle: React.CSSProperties = {};
 
-                // 호버 효과
                 if (hoveredCell?.row === row && hoveredCell?.col === col && cellNodes.length === 0) {
-                  cellStyle.backgroundColor = hexToRgba(colorOptions[hoveredCell.colorIndex], 0.3);
+                  cellStyle.backgroundColor = "var(--color-grid-hover)"; // ✅ 원하는 색상 변수 적용
                 }
 
                 return (

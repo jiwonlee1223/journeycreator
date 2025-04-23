@@ -1,8 +1,8 @@
-/* 기본 색상 정의 */
 :root {
   --color-background: #1E1E1E;
   --color-surface: #141414;
   --color-surface-variant: #666666;
+  --color-grid-hover: rgba(102, 102, 102, 0.3);
   --color-text-primary: #FFFFFF;
   --color-text-secondary: #B3B3B3;
   --color-text-disabled: #666666;
@@ -136,6 +136,28 @@ ul.context-menu li:hover {
   position: absolute;
   bottom: 12px;
   right: 12px;
+  height: 30px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+  border: none;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.send-button-phase2-wrapper {
+  display: flex;
+  justify-content: flex-end; /* 오른쪽 정렬 */
+  margin-top: 10px;
+}
+
+.send-button-phase2 {
+  position: absolute;
   height: 30px;
   padding: 0 16px;
   display: flex;
