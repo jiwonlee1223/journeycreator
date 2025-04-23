@@ -1,4 +1,5 @@
 // utils/downloadJSON.ts
+// JSON 데이터를 브라우저에서 파일로 저장하는 역할
 export function downloadJSON(jsonText: string, filename = "result.json") {
     try {
       const parsed = typeof jsonText === "string" ? JSON.parse(jsonText) : jsonText;

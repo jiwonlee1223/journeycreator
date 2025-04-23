@@ -12,19 +12,22 @@ export const gridStyle = (cols: number, rows: number) => ({
   gridTemplateRows: `repeat(${rows}, ${CELL_SIZE}px)`,
 });
 
-export const nodeFixedStyle = (color: string) =>
-  ({
+export const nodeFixedStyle = (color: string, offsetIndex: number = 0): React.CSSProperties => {
+  const offset = 4 * offsetIndex; // 인덱스마다 약간씩 이동
+  return {
     backgroundColor: color,
     boxShadow: "0 0 6px var(--shadow-default)",
     width: "10px",
     height: "10px",
     borderRadius: "50%",
     position: "absolute",
-    top: "50%",
-    left: "50%",
+    top: `calc(50% + ${offset}px)`,
+    left: `calc(50% + ${offset}px)`,
     transform: "translate(-50%, -50%)",
     opacity: 1,
-  } as const);
+    cursor: "grab",
+  };
+};
 
 
 export const contextMenuStyle = (x: number, y: number) => ({

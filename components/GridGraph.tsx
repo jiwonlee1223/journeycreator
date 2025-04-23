@@ -76,6 +76,45 @@ const GridGraph = () => {
   const [prompt1, setPrompt1] = useState("");
   const [prompt2, setPrompt2] = useState("");
 
+  function generateSmoothPath(points: { x: number; y: number }[]): string {
+    if (points.length < 2) return "";
+
+    const d = [`M ${points[0].x},${points[0].y}`];
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i === 0 ? i : i - 1];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2] || p2;
+
+      const controlPoint1 = {
+        x: p1.x + (p2.x - p0.x) / 6,
+        y: p1.y + (p2.y - p0.y) / 6,
+      };
+      const controlPoint2 = {
+        x: p2.x - (p3.x - p1.x) / 6,
+        y: p2.y - (p3.y - p1.y) / 6,
+      };
+
+      d.push(`C ${controlPoint1.x},${controlPoint1.y} ${controlPoint2.x},${controlPoint2.y} ${p2.x},${p2.y}`);
+    }
+
+    return d.join(" ");
+  }
+
+  function normalizeRowsByTouchpointIndex(json: any[]): any[] {
+    return json.map((item, index) => {
+      const updatedNodes = item["nodes info"].map((node: any) => ({
+        ...node,
+        row: index // ✅ 터치포인트 index를 row로 설정
+      }));
+      return {
+        ...item,
+        "nodes info": updatedNodes
+      };
+    });
+  }
+  
 
   // 페이지 바깥 클릭 시 컨텍스트 메뉴 닫기
   useEffect(() => {
@@ -150,7 +189,7 @@ const GridGraph = () => {
     );
     setContextMenu(null); // 삭제 후 메뉴 닫기
   };
-  
+
 
   // 드래그 시작 시 해당 노드를 ref에 저장
   const handleDragStart = (node: NodeData) => {
@@ -175,11 +214,23 @@ const GridGraph = () => {
     dragNode.current = null;
   };
 
-  // 셀 중심 좌표 계산
-  const getCellCenter = (row: number, col: number) => ({
-    x: col * CELL_SIZE + CELL_SIZE / 2,
-    y: row * CELL_SIZE + CELL_SIZE / 2,
-  });
+  const getNodeCenter = (node: NodeData, placedNodes: NodeData[]): { x: number; y: number } => {
+    const baseX = node.col * CELL_SIZE + CELL_SIZE / 2;
+    const baseY = node.row * CELL_SIZE + CELL_SIZE / 2;
+
+    // 셀 안에서 이 노드의 offsetIndex를 계산
+    const siblings = placedNodes.filter(n => n.row === node.row && n.col === node.col);
+    const offsetIndex = siblings.findIndex(n =>
+      n.id === node.id && n.subId === node.subId
+    );
+
+    const offset = 4 * offsetIndex;
+
+    return {
+      x: baseX + offset,
+      y: baseY + offset,
+    };
+  };
 
   // 같은 id 그룹별로 노드 묶기
   const groupedNodes = placedNodes.reduce((acc, node) => {
@@ -251,32 +302,44 @@ const GridGraph = () => {
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-
+        const normalized = normalizeRowsByTouchpointIndex(parsed); // ✅ row 정규화
+        
         if (Array.isArray(parsed)) {
-          const newRowTexts: string[] = parsed.map((item) => item.touchpoints ?? []);
-
+          // ✅ row 값을 터치포인트 인덱스로 덮어쓰기
+          const normalized = parsed.map((item, index) => {
+            const updatedNodes = item["nodes info"].map((node: any) => ({
+              ...node,
+              row: index
+            }));
+            return {
+              ...item,
+              "nodes info": updatedNodes
+            };
+          });
+        
+          const newRowTexts: string[] = normalized.map((item) => item.touchpoints ?? []);
           const nodeIdToColor: Record<string, string> = {};
-          const colorOptions = ['#7BFF00', '#FFFF61', '#FF18C8', '#972AFF', '#1BEAFF'];
-
-          const newPlacedNodes: NodeData[] = parsed.flatMap((item) =>
+          const colorOptions = ['#7BFF00', '#FFFF61', '#FF18C8', '#972AFF', '#1BEAFF', '#FF572E', '#3CFF99', '#FFD500', '#FF6AFF', '#14FFC9', '#FF0055', '#6E35FF', '#00FF8B', '#FF9A00', '#00C2FF', '#FF3D88', '#BAFF29', '#5800FF', '#FF375E', '#43FFD5'];
+        
+          const newPlacedNodes: NodeData[] = normalized.flatMap((item) =>
             item["nodes info"].map((node: any) => {
               const nodeId = node.nodeId;
               if (!nodeIdToColor[nodeId]) {
                 nodeIdToColor[nodeId] = colorOptions[Math.floor(Math.random() * colorOptions.length)];
               }
-
+        
               return {
-                row: node.row,
+                row: node.row, // 이미 위에서 정규화됨
                 col: node.col,
                 id: nodeId,
                 subId: node.nodeSubId,
-                color: nodeIdToColor[nodeId], // ✅ 랜덤으로 부여
+                color: nodeIdToColor[nodeId],
               };
             })
           );
-
+        
           setRowTexts(newRowTexts);
-          setRows(newRowTexts.length);
+          setRows(newRowTexts.length); // ✅ now guaranteed to match
           playNodesWithAnimation(newPlacedNodes);
         }
       } catch (err) {
@@ -334,12 +397,14 @@ const GridGraph = () => {
           <div className="grid" style={gridStyle(cols, rows)}>
             {Array.from({ length: rows }).map((_, row) =>
               Array.from({ length: cols }).map((_, col) => {
-                const node = placedNodes.find(n => n.row === row && n.col === col);
+                const cellNodes = placedNodes.filter(n => n.row === row && n.col === col); // ✅ 여러 노드 가져오기
                 let cellStyle: React.CSSProperties = {};
+
                 // 호버 효과
-                if (hoveredCell?.row === row && hoveredCell?.col === col && !node) {
+                if (hoveredCell?.row === row && hoveredCell?.col === col && cellNodes.length === 0) {
                   cellStyle.backgroundColor = hexToRgba(colorOptions[hoveredCell.colorIndex], 0.3);
                 }
+
                 return (
                   <div
                     key={`${row}-${col}`}
@@ -349,19 +414,27 @@ const GridGraph = () => {
                     onMouseLeave={() => setHoveredCell(null)}
                     onContextMenu={e => {
                       e.preventDefault();
-                      setContextMenu({ visible: true, x: e.clientX, y: e.clientY, row, col, targetNode: node! });
+                      setContextMenu({
+                        visible: true,
+                        x: e.clientX,
+                        y: e.clientY,
+                        row,
+                        col,
+                        targetNode: cellNodes[0], // 첫 번째 노드를 컨텍스트 메뉴 타겟으로
+                      });
                     }}
                     onDragOver={e => e.preventDefault()}
                     onDrop={() => handleDrop(row, col)}
                   >
-                    {node && (
+                    {cellNodes.map((node, index) => (
                       <div
+                        key={`${node.id}-${node.subId}`}
                         className="node-fixed"
-                        style={nodeFixedStyle(node.color)}
+                        style={nodeFixedStyle(node.color, index)} // ✅ offset index 전달
                         draggable
                         onDragStart={() => handleDragStart(node)}
                       />
-                    )}
+                    ))}
                   </div>
                 );
               })
@@ -374,18 +447,15 @@ const GridGraph = () => {
               const group = groupedNodes[key];
               if (group.length < 2) return null;
 
-              // ✅ nodeSubId 기준으로 정렬
               const sorted = [...group].sort((a, b) => a.subId - b.subId);
 
-              const points = sorted.map((n) => {
-                const { x, y } = getCellCenter(n.row, n.col);
-                return `${x},${y}`;
-              }).join(" ");
+              const points = sorted.map((node) => getNodeCenter(node, placedNodes));
+              const d = generateSmoothPath(points);
 
               return (
-                <polyline
-                  key={`${key}-${group.length}`}
-                  points={points}
+                <path
+                  key={key}
+                  d={d}
                   fill="none"
                   stroke={sorted[0].color}
                   strokeWidth="2"
@@ -396,42 +466,43 @@ const GridGraph = () => {
 
         </div>
 
+
         {/* 컨텍스트 메뉴 */}
         {contextMenu?.visible && (
-  <ul style={contextMenuStyle(contextMenu.x, contextMenu.y)}>
-    {!contextMenu.targetNode ? (
-      <li
-        style={contextMenuItemStyle}
-        onClick={() => {
-          handleAddUser(contextMenu.row, contextMenu.col);
-          setContextMenu(null);
-        }}
-      >
-        ➕ Add user
-      </li>
-    ) : (
-      <>
-        <li
-          style={contextMenuItemStyle}
-          onClick={() => {
-            handleAddNextNode(contextMenu.targetNode!);
-            setContextMenu(null);
-          }}
-        >
-          ➕ Add next node
-        </li>
-        <li
-          style={contextMenuItemStyle}
-          onClick={() => {
-            handleDeleteNode(contextMenu.targetNode!);
-          }}
-        >
-          ❌ Delete node
-        </li>
-      </>
-    )}
-  </ul>
-)}
+          <ul style={contextMenuStyle(contextMenu.x, contextMenu.y)}>
+            {!contextMenu.targetNode ? (
+              <li
+                style={contextMenuItemStyle}
+                onClick={() => {
+                  handleAddUser(contextMenu.row, contextMenu.col);
+                  setContextMenu(null);
+                }}
+              >
+                ➕ Add user
+              </li>
+            ) : (
+              <>
+                <li
+                  style={contextMenuItemStyle}
+                  onClick={() => {
+                    handleAddNextNode(contextMenu.targetNode!);
+                    setContextMenu(null);
+                  }}
+                >
+                  ➕ Add next node
+                </li>
+                <li
+                  style={contextMenuItemStyle}
+                  onClick={() => {
+                    handleDeleteNode(contextMenu.targetNode!);
+                  }}
+                >
+                  ❌ Delete node
+                </li>
+              </>
+            )}
+          </ul>
+        )}
       </div>
     </div>
   );
