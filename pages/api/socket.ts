@@ -45,7 +45,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
           try {
             const finalPrompt = `다음 시나리오를 기반으로 사용자 여정에서 발생하는 디자인 터치포인트를 식별하고, 
-            아래 출력 규칙을 반드시 준수하여 JSON 형식으로 출력하라.
+            다음 시나리오를 기반으로 구조화된 데이터를 JSON으로 변환하라.
+            오직 JSON만, \`\`\`json ... \`\`\` 코드블록 안에 출력하라. 그 외 텍스트는 절대 포함하지 마라.
             \n
             - 시나리오:${prompt}
             \n

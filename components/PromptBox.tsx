@@ -109,7 +109,7 @@ const PromptBox: React.FC<PromptBoxProps> = ({
             <div className="third-width empty-box">
                 <div>
                     <p className="subtle-note">
-                        📌 여기에 사용자 맞춤 패널을 추가할 수 있어요.
+스토리보드 이미지
                     </p>
 
                 </div>
