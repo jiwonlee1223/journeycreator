@@ -113,6 +113,13 @@ const GridGraph = () => {
   const importFromPromptJson = (jsonString: string) => {
     try {
       const parsed = JSON.parse(jsonString);
+      if (!Array.isArray(parsed)) {
+        console.error("Invalid JSON structure");
+        if (typeof window !== "undefined") {
+          alert("Invalid JSON structure. Expected an array of touchpoints.");
+        }
+        return;
+      }
       const normalized = normalizeRowsByTouchpointIndex(parsed); // ✅ row 정규화
 
       const newRowTexts: string[] = normalized.map((item) => item.touchpoints ?? []);
