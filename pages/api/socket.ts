@@ -40,6 +40,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         }
         (socket as any)._handlerRegistered = true;
 
+        // Phase 3: Journey Map 생성
         socket.on("initialPrompt", async (prompt: string) => {
           console.log("📨 initialPrompt 수신:", prompt);
 
@@ -123,9 +124,159 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             socket.emit("completion", "[OpenAI 호출 중 오류 발생]");
           }
         });
+
+        // 🧠 Phase 1: 구조화 데이터 생성 (context / artifact / userExperience)
+        socket.on("phase1StructuredFormat", async (scenario: string) => {
+          console.log("📨 phase1StructuredFormat 수신:", scenario);
+
+          const prompt = `
+다음 시나리오를 기반으로 구조화된 데이터를 JSON으로 변환하라.
+
+출력 형식은 다음과 같다:
+{
+  "context": [물리적 장소 및 환경 요소],
+  "artifact": [사용자가 직접 상호작용하는 제품, UI, 시스템 등],
+  "userExperience": {
+    "001": "사용자 001의 단계별 서비스 흐름",
+    "002": "사용자 002의 단계별 서비스 흐름"
+  }
+}
+
+규칙:
+- context는 물리적 공간 또는 환경 요소를 중심으로 정리
+- artifact는 인터페이스, 화면, 앱, 제품 등 사용자 경험의 구체적 매개체를 포함
+- userExperience는 각 사용자 ID 별로, 그 사용자가 겪는 여정을 시간 순으로 요약
+- 반드시 유효한 JSON만 출력 (설명, 마크다운, 코드블럭 없이)
+
+시나리오:
+${scenario}
+`;
+
+          try {
+            const completion = await openai.chat.completions.create({
+              model: "gpt-4o",
+              messages: [{ role: "user", content: prompt }],
+            });
+
+            const raw = completion.choices[0]?.message?.content ?? "";
+            const cleaned = raw.replace(/```json|```/g, "").trim();
+
+            try {
+              const parsed = JSON.parse(cleaned);
+              socket.emit("structuredResult", parsed);
+            } catch (e) {
+              console.error("⚠️ structured JSON 파싱 실패:", e);
+              socket.emit("structuredResult", { error: "⚠️ JSON 파싱 실패", raw });
+            }
+          } catch (err) {
+            console.error("❌ OpenAI structured 변환 실패:", err);
+            socket.emit("structuredResult", { error: "OpenAI 호출 실패" });
+          }
+        });
+
+        // 🎬 Phase 4: 스토리보드 JSON 생성
+        socket.on("phase4StoryboardFormat", async (scenario: string) => {
+          console.log("📨 phase4StoryboardFormat 수신:", scenario);
+
+          const prompt = `
+다음은 사용자 서비스 시나리오입니다.
+
+출력 형식은 다음과 같습니다:
+{
+  "storyboards": [
+    {
+      "sceneId": 1,
+      "title": "장면 제목",
+      "keyInteractions": ["사용자의 핵심 행동 1", "사용자의 핵심 행동 2"]
+    },
+    ...
+  ]
+}
+
+규칙:
+- 최대 5개의 장면만 생성하세요.
+- 시간 순서대로 구성하세요.
+- 반드시 유효한 JSON만 출력하십시오.
+- 마크다운, 코드블럭, 설명 없이 순수 JSON만 출력하십시오.
+- 반드시 {"storyboards": [...]} 형태의 객체를 반환하십시오.
+
+시나리오:
+${scenario}
+`;
+
+          try {
+            const completion = await openai.chat.completions.create({
+              model: "gpt-4o",
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.7,
+            });
+
+            const raw = completion.choices[0]?.message?.content ?? "";
+            const cleaned = raw.replace(/```json|```/g, "").trim();
+            const parsed = JSON.parse(cleaned);
+
+            if (Array.isArray(parsed?.storyboards)) {
+              // 이미 올바른 구조라면 그대로 보냄
+              socket.emit("storyboardResult", parsed);
+            } else if (Array.isArray(parsed)) {
+              // GPT가 배열만 반환한 경우 storyboards 키로 감쌈
+              socket.emit("storyboardResult", { storyboards: parsed });
+            } else {
+              console.warn("⚠️ GPT 응답 형식이 예상과 다름:", parsed);
+              socket.emit("storyboardResult", { error: "잘못된 형식" });
+            }
+
+          } catch (err) {
+            console.error("❌ OpenAI storyboard 변환 실패:", err);
+            socket.emit("storyboardResult", { error: "변환 실패" });
+          }
+        });
+
+        socket.on("convertStructuredToScenario", async (data: any) => {
+          console.log("📨 convertStructuredToScenario 수신:", data);
+
+          const context = (data.context || []).map((c: string) => `- ${c}`).join('\n');
+          const artifact = (data.artifact || []).map((a: string) => `- ${a}`).join('\n');
+          const userExp = Object.entries(data.userExperience || {})
+            .map(([uid, val]) => `User ${uid}:\n${val}`)
+            .join('\n\n');
+
+          const prompt = `
+다음은 구조화된 사용자 여정 데이터입니다.
+이를 바탕으로 실제 사용자 서비스 시나리오 문장을 자연스럽고 상세하게 생성하세요.
+[Context]
+${context}
+[Artifact]
+${artifact}
+[User Experience]
+${userExp}
+결과는 하나의 자연스러운 사용자 시나리오로 작성하시오.`;
+
+          try {
+            const completion = await openai.chat.completions.create({
+              model: "gpt-4o",
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.7,
+            });
+
+            const scenario = completion.choices[0]?.message?.content ?? "";
+            console.log("✅ 변환된 시나리오:", scenario);
+
+            // ✅ 원래 하던 emit
+            socket.emit("convertedScenario", scenario);
+
+            // ✅ 서버에서 바로 시나리오 → 그래프 + 스토리보드 호출
+            socket.emit("initialPrompt", scenario);
+            socket.emit("phase4StoryboardFormat", scenario);
+
+          } catch (err) {
+            console.error("❌ OpenAI 시나리오 변환 실패:", err);
+            socket.emit("convertedScenario", { error: "시나리오 생성 실패" });
+          }
+        });
+
       });
     }
-
 
     res.end();
   } catch (err) {

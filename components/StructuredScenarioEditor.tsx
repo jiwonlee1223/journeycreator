@@ -82,7 +82,9 @@ const StructuredScenarioEditor: React.FC<StructuredScenarioEditorProps> = ({
           />
         </div>
       ))}
+      
     </div>
+    
 
   );
 };

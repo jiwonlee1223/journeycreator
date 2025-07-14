@@ -11,8 +11,7 @@ import {
 } from "@/components/GridGraph.styles";
 import ControlPanel from "./ControlPanel"; // 경로는 실제 위치에 맞춰 조정
 import TouchpointContainer from "./TouchpointContainer";
-import PromptBox from "./PromptBox";
-
+import PromptOverlay from "./PromptOverlay";
 const CELL_SIZE = 50; // 그리드 셀의 크기를 픽셀 단위로 상수화
 
 
@@ -47,20 +46,13 @@ type NodeData = {
 const colorOptions = ['#7BFF00', '#FFFF61', '#FF18C8', '#972AFF', '#1BEAFF']; // 랜덤 색상 옵션
 
 const GridGraph = () => {
-  // Socket.IO 소켓 상태 관리
   const [socket, setSocket] = useState<Socket | null>(null);
-  // 그리드 행 개수 상태
   const [rows, setRows] = useState(1);
   const [rowTexts, setRowTexts] = useState<string[]>([""]);
-  // 그리드 열 개수(고정)
   const [cols] = useState(50);
-  // 배치된 노드 목록 상태
   const [placedNodes, setPlacedNodes] = useState<NodeData[]>([]);
-  // 호버 중인 셀 정보 상태
   const [hoveredCell, setHoveredCell] = useState<HoverCellData | null>(null);
-  // 업로드된 JSON 애니메이션 큐
   const [animationQueue, setAnimationQueue] = useState<NodeData[] | null>(null);
-  // 컨텍스트 메뉴 상태
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
     x: number;
@@ -69,12 +61,15 @@ const GridGraph = () => {
     col: number;
     targetNode?: NodeData;
   } | null>(null);
-  // 드래그 중인 노드 참조용 ref
   const dragNode = useRef<NodeData | null>(null);
   const [nextGroupId, setNextGroupId] = useState(1);
 
   const [prompt1, setPrompt1] = useState("");
   const [prompt2, setPrompt2] = useState("");
+
+  // ✅ 추가된 상태 (PromptOverlay에 전달)
+  const [structuredData, setStructuredData] = useState<any | null>(null);
+  const [storyboardImages, setStoryboardImages] = useState<string[]>([]);
 
   function generateSmoothPath(points: { x: number; y: number }[]): string {
     if (points.length < 2) return "";
@@ -260,8 +255,8 @@ const GridGraph = () => {
     const offset = 4 * offsetIndex;
 
     return {
-      x: baseX + offset,
-      y: baseY + offset,
+      x: baseX + offset,  // → 오른쪽으로 이동
+      y: baseY - offset,  // ↑ 위로 이동
     };
   };
 
@@ -384,10 +379,28 @@ const GridGraph = () => {
   };
 
 
-  // ‘▶ 재생’ 버튼 클릭 시 애니메이션 재생
-  const handlePlayClick = () => {
-    if (animationQueue) playNodesWithAnimation(animationQueue);
+  const handleMapSend = () => {
+    const structured = rowTexts.map((text, rowIndex) => {
+      const nodes = placedNodes
+        .filter((node) => node.row === rowIndex)
+        .map((node) => ({
+          nodeId: node.id,
+          row: node.row,
+          col: node.col,
+          nodeSubId: node.subId,
+        }));
+
+      return {
+        touchpoints: text,
+        "nodes info": nodes,
+      };
+    });
+
+    const mapJson = structured;
+    console.log("📤 [Map] ▶ 전송:", mapJson);
+    if (socket) socket.emit("updateFromMap", mapJson);
   };
+
 
   const handleRowTextChange = (index: number, value: string) => {
     setRowTexts(prev => {
@@ -402,21 +415,23 @@ const GridGraph = () => {
   return (
 
     <div>
-      <PromptBox
+      <PromptOverlay
         prompt1={prompt1}
         prompt2={prompt2}
         onChangePrompt1={setPrompt1}
         onChangePrompt2={setPrompt2}
-        onImportJson={importFromPromptJson} // ✅ 추가
+        onImportJson={importFromPromptJson}
+        structuredData={structuredData}
+        storyboardImages={storyboardImages}
       />
 
 
       <ControlPanel
         onDownload={downloadJson}
         onFileUpload={handleFileUpload}
-        onPlay={handlePlayClick} onAddRow={function (): void {
-          throw new Error('Function not implemented.');
-        }} />
+        onAddRow={addRow}
+      />
+
 
       <div style={{ display: "flex" }}>
         <TouchpointContainer
@@ -473,6 +488,10 @@ const GridGraph = () => {
                 );
               })
             )}
+          </div>
+
+          <div style={{ marginTop: "12px", textAlign: "center" }}>
+            <button onClick={handleMapSend} className="send-button">▶</button>
           </div>
 
           {/* 노드 그룹 선 연결용 SVG 오버레이 */}

@@ -21,8 +21,8 @@ export const nodeFixedStyle = (color: string, offsetIndex: number = 0): React.CS
     height: "10px",
     borderRadius: "50%",
     position: "absolute",
-    top: `calc(50% + ${offset}px)`,
-    left: `calc(50% + ${offset}px)`,
+    top: `calc(50% - ${offset}px)`,   // 위쪽으로 이동
+    left: `calc(50% + ${offset}px)`,  // 오른쪽으로 이동
     transform: "translate(-50%, -50%)",
     opacity: 1,
     cursor: "grab",
