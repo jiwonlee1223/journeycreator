@@ -12,8 +12,9 @@ import {
 import ControlPanel from "./ControlPanel"; // 경로는 실제 위치에 맞춰 조정
 import TouchpointContainer from "./TouchpointContainer";
 import PromptOverlay from "./PromptOverlay";
-const CELL_SIZE = 50; // 그리드 셀의 크기를 픽셀 단위로 상수화
+import PersonaPromptBox from "./PersonaPromptBox";
 
+const CELL_SIZE = 50; // 그리드 셀의 크기를 픽셀 단위로 상수화
 
 // HEX 색상값을 RGBA 문자열로 변환해주는 유틸 함수
 function hexToRgba(hex: string, alpha: number = 0.3): string {
@@ -52,7 +53,7 @@ const GridGraph = () => {
   const [cols] = useState(50);
   const [placedNodes, setPlacedNodes] = useState<NodeData[]>([]);
   const [hoveredCell, setHoveredCell] = useState<HoverCellData | null>(null);
-  const [animationQueue, setAnimationQueue] = useState<NodeData[] | null>(null);
+  const [activePromptBoxNode, setActivePromptBoxNode] = useState<NodeData | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
     x: number;
@@ -70,6 +71,9 @@ const GridGraph = () => {
   // ✅ 추가된 상태 (PromptOverlay에 전달)
   const [structuredData, setStructuredData] = useState<any | null>(null);
   const [storyboardImages, setStoryboardImages] = useState<string[]>([]);
+
+  const [closedPromptBoxIds, setClosedPromptBoxIds] = useState<Set<string>>(new Set());
+  const [personaDataMap, setPersonaDataMap] = useState<Record<string, any>>({});
 
   function generateSmoothPath(points: { x: number; y: number }[]): string {
     if (points.length < 2) return "";
@@ -113,6 +117,13 @@ const GridGraph = () => {
   const importFromPromptJson = (jsonString: string) => {
     try {
       const parsed = JSON.parse(jsonString);
+      if (!Array.isArray(parsed)) {
+        console.error("Invalid JSON structure");
+        if (typeof window !== "undefined") {
+          alert("Invalid JSON structure. Expected an array of touchpoints.");
+        }
+        return;
+      }
       const normalized = normalizeRowsByTouchpointIndex(parsed); // ✅ row 정규화
 
       const newRowTexts: string[] = normalized.map((item) => item.touchpoints ?? []);
@@ -163,25 +174,76 @@ const GridGraph = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleMapDataGenerated = (data: any) => {
+      console.log("🗺️ 수신된 Map Data from socket:", data);
+      importFromPromptJson(JSON.stringify(data));
+    };
+
+    socket.on("mapDataGenerated", handleMapDataGenerated);
+
+    return () => {
+      socket.off("mapDataGenerated", handleMapDataGenerated);
+    };
+  }, [socket]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleFlourished = (data: any) => {
+      const nodeId = activePromptBoxNode?.id;
+      if (!nodeId) return;
+
+      // 저장
+      setPersonaDataMap(prev => ({
+        ...prev,
+        [nodeId]: data,
+      }));
+    };
+
+    socket.on("personaFlourished", handleFlourished);
+
+    return () => {
+      socket.off("personaFlourished", handleFlourished);
+    };
+  }, [socket, activePromptBoxNode]);
+
+
   // 빈 셀 클릭 시 새로운 노드 추가
   const handleAddUser = (row: number, col: number) => {
-    if (!placedNodes.some(node => node.row === row && node.col === col)) {
-      const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
-      const newNodeId = String(nextGroupId).padStart(3, "0");
+    const existingNode = placedNodes.find(n => n.row === row && n.col === col);
 
-      const newNode: NodeData = {
-        row,
-        col,
-        color: randomColor,
-        id: newNodeId, // ✅ 문자열 nodeId
-        subId: 0,
-      };
-
-      setPlacedNodes(prev => [...prev, newNode]);
-      setNextGroupId(prev => prev + 1);
-
-      if (socket) socket.emit("nodePlaced", newNode);
+    if (existingNode) {
+      // initial node만 가능, 이미 있던 노드고 닫혀 있었다면 다시 열기 >> 추후 업데이트 예정
+      if (existingNode.subId === 0 && closedPromptBoxIds.has(existingNode.id)) {
+        setClosedPromptBoxIds(prev => {
+          const next = new Set(prev);
+          next.delete(existingNode.id);
+          return next;
+        });
+        setActivePromptBoxNode(existingNode);
+      }
+      return;
     }
+
+    // 새로운 노드 추가
+    const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+    const newNodeId = String(nextGroupId).padStart(3, "0");
+
+    const newNode: NodeData = {
+      row,
+      col,
+      color: randomColor,
+      id: newNodeId,
+      subId: 0,
+    };
+
+    setPlacedNodes(prev => [...prev, newNode]);
+    setNextGroupId(prev => prev + 1);
+    setActivePromptBoxNode(newNode);
+    if (socket) socket.emit("nodePlaced", newNode);
   };
 
   const handleAddNextNode = (origin: NodeData) => {
@@ -410,10 +472,14 @@ const GridGraph = () => {
     });
   };
 
+  const handlePersonaPromptSubmit = (node: NodeData, mapData: any[]) => {
+    // 이 mapData를 바로 import해서 placedNodes로 적용하는 구조라면 이렇게:
+    importFromPromptJson(JSON.stringify(mapData));
+    setActivePromptBoxNode(null);
+  };
 
-  // 렌더링 부분: 버튼 그룹과 그리드 + SVG 오버레이 + 컨텍스트 메뉴
+
   return (
-
     <div>
       <PromptOverlay
         prompt1={prompt1}
@@ -459,6 +525,19 @@ const GridGraph = () => {
                     key={`${row}-${col}`}
                     className="grid-cell"
                     style={cellStyle}
+                    onClick={() => {
+                      if (cellNodes.length === 1) {
+                        const node = cellNodes[0];
+                        if (node.subId === 0 && closedPromptBoxIds.has(node.id)) {
+                          setClosedPromptBoxIds(prev => {
+                            const next = new Set(prev);
+                            next.delete(node.id);
+                            return next;
+                          });
+                          setActivePromptBoxNode(node);
+                        }
+                      }
+                    }}
                     onMouseEnter={() => setHoveredCell({ row, col, colorIndex: 0 })}
                     onMouseLeave={() => setHoveredCell(null)}
                     onContextMenu={e => {
@@ -556,6 +635,19 @@ const GridGraph = () => {
             )}
           </ul>
         )}
+
+        {activePromptBoxNode && (
+          <PersonaPromptBox
+            node={activePromptBoxNode}
+            onGeneratePrompt={handlePersonaPromptSubmit}
+            onClose={() => {
+              setClosedPromptBoxIds(prev => new Set(prev).add(activePromptBoxNode.id));
+              setActivePromptBoxNode(null);
+            }}
+            flourished={personaDataMap[activePromptBoxNode.id]}
+          />
+        )}
+
       </div>
     </div>
   );

@@ -50,14 +50,14 @@ const PromptOverlay: React.FC<PromptOverlayProps> = ({
       setLocalStructuredData(data);
     };
 
-    const handleStoryboardResult = async (data: any) => {
-      console.log("📦 storyboardResult 전체 응답 내용:", JSON.stringify(data, null, 2));
-      if (Array.isArray(data?.storyboards)) {
-        await generateStoryboardImages(data);
-      } else {
-        console.warn("🚫 [socket] storyboardResult: 유효한 storyboards 없음", data);
-      }
-    };
+    // const handleStoryboardResult = async (data: any) => {
+    //   console.log("📦 storyboardResult 전체 응답 내용:", JSON.stringify(data, null, 2));
+    //   if (Array.isArray(data?.storyboards)) {
+    //     await generateStoryboardImages(data);
+    //   } else {
+    //     console.warn("🚫 [socket] storyboardResult: 유효한 storyboards 없음", data);
+    //   }
+    // };
 
     const handleConvertedScenario = (scenarioText: string) => {
       console.log("🟢 [convertedScenario] 시나리오 수신:", scenarioText);
@@ -74,14 +74,14 @@ const PromptOverlay: React.FC<PromptOverlayProps> = ({
     socket.on("connect", handleConnect);
     socket.on("completion", handleCompletion);
     socket.on("structuredResult", handleStructuredResult);
-    socket.on("storyboardResult", handleStoryboardResult);
+    // socket.on("storyboardResult", handleStoryboardResult);
     socket.on("convertedScenario", handleConvertedScenario); // ✅ 추가됨
 
-    return () => {
+    return () => { 
       socket.off("connect", handleConnect);
       socket.off("completion", handleCompletion);
       socket.off("structuredResult", handleStructuredResult);
-      socket.off("storyboardResult", handleStoryboardResult);
+      // socket.off("storyboardResult", handleStoryboardResult);
       socket.off("convertedScenario", handleConvertedScenario); // ✅ 추가됨
     };
   }, [onChangePrompt2, onImportJson, onChangePrompt1]);
@@ -89,7 +89,6 @@ const PromptOverlay: React.FC<PromptOverlayProps> = ({
 
   const handleSend = async () => {
     console.log("📤 [handleSend] 사용자 입력 시나리오:", prompt1);
-
 
     socket.emit("initialPrompt", prompt1);   // 그래프 JSON
     socket.emit("phase1StructuredFormat", prompt1);  // 구조화 JSON

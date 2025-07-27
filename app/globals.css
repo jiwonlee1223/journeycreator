@@ -17,11 +17,14 @@
   --cell-size: 50px;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
-  background-color: var(--color-background); /* 다크 배경 */
-  color: var(--color-text-primary); /* 기본 텍스트 색상 */
+  background-color: var(--color-background);
+  /* 다크 배경 */
+  color: var(--color-text-primary);
+  /* 기본 텍스트 색상 */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   height: 100%;
   width: 100%;
@@ -149,6 +152,7 @@ ul.context-menu li:hover {
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
+
 .image-refresh-button {
   position: absolute;
   bottom: 12px;
@@ -169,7 +173,8 @@ ul.context-menu li:hover {
 
 .send-button-phase2-wrapper {
   display: flex;
-  justify-content: flex-end; /* 오른쪽 정렬 */
+  justify-content: flex-end;
+  /* 오른쪽 정렬 */
   margin-top: 10px;
 }
 
@@ -218,11 +223,13 @@ ul.context-menu li:hover {
   width: 100%;
   gap: 8px;
   margin-bottom: 20px;
-  align-items: stretch; /* ✅ 내부 box들의 height를 동일하게 */
+  align-items: stretch;
+  /* ✅ 내부 box들의 height를 동일하게 */
 }
 
 .third-width {
-  width: calc(100% / 3 - 6px); /* 3등분 + gap 보정 */
+  width: calc(100% / 3 - 6px);
+  /* 3등분 + gap 보정 */
   display: flex;
   flex-direction: column;
 }
@@ -293,7 +300,8 @@ ul.context-menu li:hover {
 .structured-wrapper {
   display: flex;
   flex-direction: column;
-  height: 100%; /* ✅ 중요 */
+  height: 100%;
+  /* ✅ 중요 */
   overflow-y: auto;
   gap: 12px;
   padding-right: 4px;
@@ -358,11 +366,12 @@ ul.context-menu li:hover {
 }
 
 .empty-box {
-  position: relative; 
+  position: relative;
   background-color: var(--color-surface);
   padding: 12px;
   border-radius: 8px;
-  flex: 1; /* ✅ 비어있어도 균등하게 높이 채움 */
+  flex: 1;
+  /* ✅ 비어있어도 균등하게 높이 채움 */
 }
 
 /* global.css 또는 PromptBox.module.css 등 */
@@ -372,7 +381,8 @@ ul.context-menu li:hover {
   flex-direction: column;
   align-items: center;
   overflow-y: auto;
-  max-height: 300px; /* 필요에 따라 조정 */
+  max-height: 300px;
+  /* 필요에 따라 조정 */
   padding: 12px;
 }
 
@@ -422,7 +432,6 @@ ul.context-menu li:hover {
   overflow: auto;
 }
 
-.send-button,
 .image-refresh-button {
   margin-top: 8px;
   background: #333;
@@ -456,7 +465,7 @@ ul.context-menu li:hover {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -478,4 +487,182 @@ ul.context-menu li:hover {
   background: white;
   padding: 8px;
   transition: transform 0.3s ease;
+}
+
+/* persona prompt box */
+
+/* globals.css */
+
+.persona-box {
+  position: absolute;
+  background: #333;
+  color: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 1000;
+
+  min-width: 300px;
+  /* ✅ 최소 너비 */
+  min-height: 200px;
+  /* ✅ 최소 높이 */
+  width: fit-content;
+  /* ✅ 내용 크기에 맞춰 자동 확장 */
+  height: fit-content;
+  /* ✅ 높이도 내용에 맞춰 확장 */
+  max-width: 600px;
+  /* ✅ 최대 너비 제한 (선택) */
+  max-height: 90vh;
+  /* ✅ 너무 길면 화면 안에서 제한 (선택) */
+
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+}
+
+
+.persona-box-title {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.persona-textarea {
+  width: 100%;
+  resize: vertical;
+  font-size: 14px;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #aaa;
+  box-sizing: border-box;
+  font-family: inherit;
+  background: #444;
+  color: white;
+}
+
+.persona-buttons {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.persona-buttons button {
+  padding: 6px 10px;
+  background: #555;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.persona-buttons button:hover {
+  background: #777;
+}
+
+.persona-buttons button+button {
+  margin-left: 6px;
+}
+
+.persona-result {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.persona-result-image {
+  flex: 1 1 180px;
+  max-width: 180px;
+}
+
+.persona-result-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.persona-result-text {
+  flex: 2 1 300px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.persona-result-text h3,
+.persona-result-text h4 {
+  margin: 10px 0 4px;
+  font-weight: bold;
+}
+.generate-button {
+  display: inline-block;
+  height: 40px;
+  min-width: 160px;
+  padding: 0 12px;
+  font-size: 14px;
+  border-radius: 4px;
+  background-color: #555;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.button-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+
+  /* These are KEY: */
+  vertical-align: middle;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.button-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+}
+
+.button-label {
+  white-space: nowrap;
+  line-height: 1;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.persona-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.close-button {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: white;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
 }

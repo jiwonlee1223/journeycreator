@@ -2,6 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { Server as NetServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
+import { registerPersonaPromptHandler } from "./socketPersonaPrompt";
 import { OpenAI } from "openai";
 
 const openai = new OpenAI({
@@ -274,6 +275,8 @@ ${userExp}
             socket.emit("convertedScenario", { error: "시나리오 생성 실패" });
           }
         });
+
+        registerPersonaPromptHandler(socket);
 
       });
     }
